@@ -16,6 +16,7 @@ dependencies {
     compile 'com.madgag.spongycastle:core:1.53.0.0'
     compile 'com.madgag.spongycastle:prov:1.53.0.0'
     testCompile 'junit:junit:4.12'
+    testCompile 'com.mauriciotogneri:trail:1.0.0'
     testCompile 'com.madgag.spongycastle:core:1.53.0.0'
     testCompile 'com.madgag.spongycastle:pkix:1.53.0.0'
     testCompile 'com.madgag.spongycastle:prov:1.53.0.0'

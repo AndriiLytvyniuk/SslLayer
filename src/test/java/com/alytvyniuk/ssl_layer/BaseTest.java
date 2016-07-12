@@ -9,7 +9,6 @@ import com.alytvyniuk.ssl_layer.test_facility.ServerThread;
 import org.apache.commons.io.FileUtils;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
@@ -20,18 +19,6 @@ public abstract class BaseTest {
     private SSLContextProvider mSSLContextProvider = new SSLContextProvider("src/test/res/ssl_converter_test/keys/ssl_proxy.jks", "ssl_proxy");
     private File mServerReceivedFile = new File("src/test/res/ssl_converter_test/ServerReceived");
     private File mClientSentFile = new File("src/test/res/ssl_converter_test/ClientSent");
-
-    @Test
-    public void ordinaryTest() throws IOException {
-        System.out.println("ordinaryTest");
-        runRequest("src/test/res/ssl_converter_test/requests/request", 1000);
-    }
-
-    @Test
-    public void withDelaysTest() throws IOException {
-        System.out.println("withDelaysTest");
-        runRequest("src/test/res/ssl_converter_test/requests/request_with_delays", 1000);
-    }
 
     protected void runRequest(String requestFilePath, int serverBufferSize) throws IOException {
         File requestFile = new File(requestFilePath);

@@ -1,5 +1,7 @@
 package com.alytvyniuk.ssl_layer.test_facility;
 
+import com.mauriciotogneri.trail.Trail;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -15,6 +17,7 @@ import java.util.Arrays;
  */
 public class ClientThread extends Thread {
 
+    private static final String TAG = "ClientThread";
     private final BufferedReader mRequestIS;
     private final OutputStream mClientWriteFileOS;
     private final OutputStream mChannelOS;
@@ -38,9 +41,9 @@ public class ClientThread extends Thread {
                 }
                 line = line.concat(System.lineSeparator());
                 byte[] data = line.getBytes();
-                System.out.println(Arrays.toString(data));
                 mChannelOS.write(data, 0, data.length);
                 mClientWriteFileOS.write(data, 0, data.length);
+                Trail.verbose(TAG, "Sent " + new String(data));
             }
             mChannelOS.close();
         } catch (IOException e) {
