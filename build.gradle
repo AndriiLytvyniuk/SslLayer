@@ -1,0 +1,23 @@
+version '1.0-SNAPSHOT'
+
+apply plugin: 'java'
+apply plugin: 'idea'
+
+sourceCompatibility = 1.7
+
+repositories {
+    mavenCentral()
+    maven {
+        url  "http://jcenter.bintray.com"
+    }
+}
+
+dependencies {
+    compile 'com.madgag.spongycastle:core:1.53.0.0'
+    compile 'com.madgag.spongycastle:prov:1.53.0.0'
+    testCompile 'junit:junit:4.12'
+    testCompile 'com.madgag.spongycastle:core:1.53.0.0'
+    testCompile 'com.madgag.spongycastle:pkix:1.53.0.0'
+    testCompile 'com.madgag.spongycastle:prov:1.53.0.0'
+    compile 'commons-io:commons-io:2.4'
+}
