@@ -1,225 +1,199 @@
 package com.alytvyniuk.ssl_layer;
 
 import java.io.Closeable;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.WritableByteChannel;
-import java.util.logging.Logger;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
-import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLEngineResult.Status;
 
-public class SslLayer implements Closeable {
+public class SslLayer extends SSLHandShaker implements Closeable {
 
-    private boolean isClosed = false;
-    private javax.net.ssl.SSLEngine sslEngine;
-    private InputStream encryptedInput;
-    private OutputStream encryptedOutput;
-    private static final int BLOCK_SIZE = 1500;
-    private byte[] tmp = new byte[BLOCK_SIZE];
-    private SSLSession session;
-    private int appBufferMax;
-    private int netBufferMax;
-    private ByteBuffer emptyBuffer = java.nio.ByteBuffer.allocate(0);
-    private ByteBuffer serverIn;
-    private ByteBuffer limbo;
-    private final boolean mIsClient;
-    private WritableByteChannel mByteChannel;
-    boolean isHandShakeFinised;
+    private final InputStream decryptedInputStream = new DecryptedInputStream();
+    private final OutputStream decryptedOutputStream = new DecryptedOutputStream();
 
     public SslLayer(SSLEngine sslEngine, InputStream encryptedInput, OutputStream encryptedOutput) {
-        this.sslEngine = sslEngine;
-        mIsClient = sslEngine.getUseClientMode();
-        this.encryptedInput = encryptedInput;
-        this.encryptedOutput = encryptedOutput;
-        this.session = sslEngine.getSession();
-        this.appBufferMax = session.getApplicationBufferSize();
-        this.netBufferMax = session.getPacketBufferSize();
-        this.serverIn = java.nio.ByteBuffer.allocate(appBufferMax + 50);
-        this.serverIn.limit(0);
-        this.limbo = java.nio.ByteBuffer.allocate(netBufferMax);
-        mByteChannel = Channels.newChannel(encryptedOutput);
+        super(sslEngine, encryptedInput, encryptedOutput);
     }
 
-    public synchronized void write(byte[] buffer, int offset, int length) throws IOException {
+    public InputStream getInputStream() {
+        return decryptedInputStream;
+    }
+
+    public OutputStream getOutputStream() {
+        return decryptedOutputStream;
+    }
+
+    private synchronized void writeDecrypted(byte[] buffer, int offset, int length) throws IOException {
         ByteBuffer writeBuffer = ByteBuffer.wrap(buffer, offset, length);
-        if (!isHandShakeFinised) {
-            doWrap(emptyBuffer);
+        if (!isHandShakeFinished()) {
+            SSLEngineResult r = handshake();
+            log("HandShake done " + getResultString(r));
         }
-        this.doWrap(writeBuffer);
+
+//        if (!isHandShakeFinished) {
+//            doWrap(EMPTY_BUFFER);
+//        }
+//        this.doWrap(writeBuffer);
     }
 
-    public java.io.OutputStream getDecryptedOutput() {
-        return new DecryptedOutput();
-    }
-
-    public synchronized int read(byte[] buffer, int offset, int maxLength) throws IOException {
-        while (this.serverIn.remaining() == 0) {
-            if (this.isClosed) return -1;
-            try {
-                doUnwrap();
-            } catch (java.io.EOFException onClosed) {
-                this.close();
-                return -1;
-            }
-            if (this.isClosed) return -1;
+    /**
+     * Reads data to buffer
+     * @param buffer
+     * @param offset
+     * @param maxLength
+     * @return size of read bytes or -1 if nothing to read
+     * @throws IOException
+     */
+    private synchronized int readDecrypted(byte[] buffer, int offset, final int maxLength) throws IOException {
+        if (maxLength > buffer.length - offset || offset < 0 || maxLength <= 0) {
+            throw new IllegalArgumentException("Wrong size requested. Buffer length: " + buffer.length
+                    + " offset: " + offset + " maxLength " + maxLength);
         }
-        int limit = Math.min(maxLength, this.serverIn.remaining());
+        if (!isHandShakeFinished()) {
+            handshake();
+        }
+//        int readLength = 0;
+//        while (readLength < maxLength) {
+//            if (decryptedBuffer.remaining() == 0) {
+//                if (doUnwrap() == -1) {
+//                    break;
+//                }
+//            }
+//            if (decryptedBuffer.remaining() > 0) {
+//                int length = Math.min(maxLength - readLength, decryptedBuffer.remaining());
+//                readLength += length;
+//                decryptedBuffer.get(buffer, offset, length);
+//                offset += length;
+//            } else {
+//                break;
+//            }
+//        }
+//        log("readDecrypted length: " + readLength);
+//        return readLength == 0 ? -1 : readLength;
 
-        //System.err.println("Reading "+limit+" bytes from serverIn, position before: "+this.serverIn.position());
-        this.serverIn.get(buffer, offset, limit);
-        //System.err.println("Reading "+limit+" bytes from serverIn, position after: "+this.serverIn.position());
 
-        //System.err.println("Reading "+limit+" bytes from serverIn: "+serverIn);
+//        while (decryptedBuffer.remaining() == 0) {
+//            try {
+//                doUnwrap();
+//            } catch (EOFException onClosed) {
+//                this.close();
+//                return -1;
+//            }
+//        }
+        int limit = Math.min(maxLength, this.decryptedBuffer.remaining());
+
+        decryptedBuffer.get(buffer, offset, limit);
 
         return limit;
     }
 
-    public java.io.InputStream getDecryptedInput() {
-        return new DecryptedInput();
-    }
+//    private int doUnwrap() throws IOException {
+//        //System.err.println("doUnwrap()");
+//        if (decryptedBuffer.remaining() == 0) {
+//            decryptedBuffer.clear();
+//        } else {
+//            decryptedBuffer.flip();
+//        }
+//
+//        //limbo.flip();
+//        //log("do Unwrap read " + encryptedInput.available());
+//        //int count = encryptedInput.read(readEncryptedBuffer, 0, readEncryptedBuffer.length);
+//        log("do Unwrap read2 " + count);
+//        if (count == -1) {
+//            return -1;
+//        }
+//        SSLEngineResult r = sslEngine.unwrap(ByteBuffer.wrap(readEncryptedBuffer, 0, count), decryptedBuffer);
+//        int consumed = r.bytesConsumed();
+//        while ((r.getStatus() == Status.BUFFER_UNDERFLOW || consumed < count) && count != -1) {
+//            if (r.getStatus() == Status.BUFFER_UNDERFLOW) {
+//                log("do Unwrap consumed = " + consumed + " , " + count);
+//                byte[] newTmp = new byte[readEncryptedBuffer.length + ENCRYPTED_BUFFER_SIZE];
+//                System.arraycopy(readEncryptedBuffer, 0, newTmp, 0, count);
+//                readEncryptedBuffer = newTmp;
+//                count += encryptedInput.read(readEncryptedBuffer, count, readEncryptedBuffer.length - count);
+//            } else if (r.getHandshakeStatus() == HandshakeStatus.NEED_TASK) {
+//                Runnable runnable = sslEngine.getDelegatedTask();
+//                if (runnable != null) runnable.run();
+//            }
+//            ByteBuffer tempBuf = ByteBuffer.wrap(readEncryptedBuffer, consumed, count - consumed);
+//            log("temp " + tempBuf);
+//            r = sslEngine.unwrap(tempBuf, decryptedBuffer);
+//            consumed += r.bytesConsumed();
+//
+//            log("do Unwrap consumed = " + consumed + " , " + count + ", r=" + r);
+//        }
+//        log("Unwrap " + getResultString(r));
+////        if (r.getHandshakeStatus() == HandshakeStatus.FINISHED) {
+////            isHandShakeFinished = true;
+////        }
+//
+//        decryptedBuffer.flip();
+//        //limbo.clear();
+//        int length = r.bytesProduced();
+//        if (length > 0) {
+//            return length;
+//        }
+//
+//        if (r.getStatus() == Status.CLOSED) {
+//            throw new EOFException("End Of Stream");
+//        } else if (r.getStatus() != Status.OK) {
+//            throw new IOException("Unhandled Status: " + r.getStatus());
+//        }
+//
+//        if (r.getHandshakeStatus() != HandshakeStatus.NOT_HANDSHAKING) {
+//            continueHandshake(r);
+//        }
+//        return length;
+//    }
 
-    private void doUnwrap() throws IOException {
-        //System.err.println("doUnwrap()");
-        if (this.serverIn.remaining() == 0) {
-            this.serverIn.clear();
-        } else {
-            this.serverIn.flip();
-        }
-
-        //limbo.flip();
-        log("do Unwrap read " + encryptedInput.available());
-        int count = encryptedInput.read(tmp, 0, tmp.length);
-        log("do Unwrap read2 " + count);
-        if (count == -1) {
-            this.close();
-            return;
-        }
-        javax.net.ssl.SSLEngineResult r = sslEngine.unwrap(java.nio.ByteBuffer.wrap(tmp, 0, count), serverIn);
-        int consumed = r.bytesConsumed();
-        while ((r.getStatus() == Status.BUFFER_UNDERFLOW || consumed < count) && count != -1) {
-            if (r.getStatus() == Status.BUFFER_UNDERFLOW) {
-                log("do Unwrap consumed = " + consumed + " , " + count);
-                byte[] newTmp = new byte[tmp.length + BLOCK_SIZE];
-                System.arraycopy(tmp, 0, newTmp, 0, count);
-                tmp = newTmp;
-                count += encryptedInput.read(tmp, count, tmp.length - count);
-            } else if (r.getHandshakeStatus() == HandshakeStatus.NEED_TASK) {
-                Runnable runnable = sslEngine.getDelegatedTask();
-                if (runnable != null) runnable.run();
-            }
-            ByteBuffer tempBuf = ByteBuffer.wrap(tmp, consumed, count - consumed);
-            log("temp " + tempBuf);
-            r = sslEngine.unwrap(tempBuf, serverIn);
-            consumed += r.bytesConsumed();
-
-            log("do Unwrap consumed = " + consumed + " , " + count + ", r=" + r);
-        }
-        log("Unwrap " + getResultString(r));
-        if (r.getHandshakeStatus() == HandshakeStatus.FINISHED) {
-            isHandShakeFinised = true;
-        }
-
-        serverIn.flip();
-        //limbo.clear();
-        int length = r.bytesProduced();
-        if (length > 0) {
-            return;
-        }
-
-        if (r.getStatus() == Status.CLOSED) {
-            throw new java.io.EOFException("End Of Stream");
-        } else if (r.getStatus() != Status.OK) {
-            throw new java.io.IOException("Unhandled Status: " + r.getStatus());
-        }
-        if (r.getHandshakeStatus() != HandshakeStatus.NOT_HANDSHAKING) {
-            continueHandshake(r);
-        }
-    }
-
-    private void doWrap(java.nio.ByteBuffer serverOut) throws IOException {
+    private void doWrap(ByteBuffer serverOut) throws IOException {
         //System.err.println("doWrap()");
-        javax.net.ssl.SSLEngineResult r = sslEngine.wrap(serverOut, limbo);
-        log("Wrap " + getResultString(r));
-        if (r.getHandshakeStatus() == HandshakeStatus.FINISHED) {
-            isHandShakeFinised = true;
-        }
+        SSLEngineResult r = sslEngine.wrap(serverOut, limbo);
+        //log("Wrap " + getResultString(r));
+//        if (r.getHandshakeStatus() == HandshakeStatus.FINISHED) {
+//            isHandShakeFinished = true;
+//        }
         limbo.flip();
-        log("wrap before write " + limbo);
-        mByteChannel.write(limbo);
+        //log("wrap before write " + limbo);
+        writableByteChannel.write(limbo);
         //encryptedOutput.write(limbo.array(), limbo.arrayOffset() + limbo.position(), limbo.remaining());
-        log("Wrap after write " + limbo);
+        //log("Wrap after write " + limbo);
         limbo.clear();
 
         if (r.getStatus() == Status.CLOSED) {
-            throw new java.io.EOFException("End Of Stream");
+            throw new EOFException("End Of Stream");
         } else if (r.getStatus() != Status.OK) {
-            throw new java.io.IOException("Unhandled Status: " + r.getStatus());
+            throw new IOException("Unhandled Status: " + r.getStatus());
         }
         if (r.getHandshakeStatus() != HandshakeStatus.NOT_HANDSHAKING) {
             continueHandshake(r);
         }
-    }
-
-    private void doTask() throws IOException {
-        //System.err.println("doTask()");
-        Runnable runnable = sslEngine.getDelegatedTask();
-        if (runnable != null) runnable.run();
-        //  typically needs to send data after task
-        doWrap(emptyBuffer);
-    }
-
-    private void continueHandshake(javax.net.ssl.SSLEngineResult r) throws IOException {
-        //System.err.println("continueHandshake: "+r.getHandshakeStatus());
-        switch (r.getHandshakeStatus()) {
-            case NEED_TASK:
-                doTask();
-                break;
-            case NEED_WRAP:
-                doWrap(emptyBuffer);
-                break;
-            case NEED_UNWRAP:
-                doUnwrap();
-                break;
-            default:
-                break;
-        }
-    }
-
-    public static short readShort(InputStream in) throws java.io.IOException {
-        int b = in.read();
-        if (b == -1) throw new java.io.EOFException("End Of Stream");
-        short s = (short) (b << 8);
-        b = in.read();
-        if (b == -1) throw new java.io.EOFException("End Of Stream");
-        s += b;
-        return s;
     }
 
     public synchronized void close() throws IOException {
         log("close");
-        if (this.isClosed == false) {
-            this.isClosed = true;
-            try {
-                if (this.encryptedInput != null) this.encryptedInput.close();
-                if (this.encryptedOutput != null) this.encryptedOutput.close();
-            } catch (Exception x) {
-            }
-        }
+//        if (this.isClosed == false) {
+//            this.isClosed = true;
+//            try {
+//                if (this.encryptedInput != null) this.encryptedInput.close();
+//                if (this.encryptedOutput != null) this.encryptedOutput.close();
+//            } catch (Exception x) {
+//            }
+//        }
     }
 
-    public class DecryptedInput extends InputStream {
+    private class DecryptedInputStream extends InputStream {
         private byte[] singleByte = new byte[1];
 
         @Override
         public int read() throws IOException {
-            int count = SslLayer.this.read(singleByte, 0, 1);
+            int count = readDecrypted(singleByte, 0, 1);
             if (count == -1) return -1;
             else if (count != 1) throw new IOException("Unexpected read count: " + count);
             return singleByte[0];
@@ -227,12 +201,12 @@ public class SslLayer implements Closeable {
 
         @Override
         public int read(byte[] b) throws IOException {
-            return SslLayer.this.read(b, 0, b.length);
+            return readDecrypted(b, 0, b.length);
         }
 
         @Override
         public int read(byte[] b, int off, int len) throws IOException {
-            return SslLayer.this.read(b, off, len);
+            return readDecrypted(b, off, len);
         }
 
         @Override
@@ -241,37 +215,28 @@ public class SslLayer implements Closeable {
         }
     }
 
-    public class DecryptedOutput extends OutputStream {
+    private class DecryptedOutputStream extends OutputStream {
         private byte[] singleByte = new byte[1];
 
         @Override
         public void write(int b) throws IOException {
             singleByte[0] = (byte) b;
-            SslLayer.this.write(singleByte, 0, 1);
+            writeDecrypted(singleByte, 0, 1);
         }
 
         @Override
         public void write(byte[] b) throws IOException {
-            SslLayer.this.write(b, 0, b.length);
+            writeDecrypted(b, 0, b.length);
         }
 
         @Override
         public void write(byte[] b, int off, int len) throws IOException {
-            SslLayer.this.write(b, off, len);
+            writeDecrypted(b, off, len);
         }
 
         @Override
         public void close() throws IOException {
             SslLayer.this.close();
         }
-    }
-
-    private String getResultString(SSLEngineResult r) {
-        return "consumed = " + r.bytesConsumed() + " produced = " + r.bytesProduced()
-                + " status = " + r.getStatus() + " handshakeStatus " + r.getHandshakeStatus();
-    }
-
-    private void log(String message) {
-        System.out.println((mIsClient ? "Client" : "Server") + " " + message);
     }
 }
