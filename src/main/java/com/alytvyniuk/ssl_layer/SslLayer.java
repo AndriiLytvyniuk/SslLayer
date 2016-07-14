@@ -8,8 +8,9 @@ import java.nio.ByteBuffer;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
+import javax.net.ssl.SSLException;
 
-public class SslLayer extends SSLHandShaker implements Closeable {
+public class SslLayer extends SSLHandShaker {
 
     private final InputStream decryptedInputStream = new DecryptedInputStream();
     private final OutputStream decryptedOutputStream = new DecryptedOutputStream();
@@ -37,38 +38,39 @@ public class SslLayer extends SSLHandShaker implements Closeable {
      */
     private synchronized int readDecrypted(byte[] buffer, int offset, final int maxLength) throws IOException {
         checkByteArrayParameters(buffer, offset, maxLength);
+        throwIfClosed();
         if (!isHandShaken()) {
             SSLEngineResult r = handshake();
             log("HandShake done " + getResultString(r));
         }
         int readLength = 0;
         int unwrapResult = -1;
-        while (readLength < maxLength) {
-            if (decryptedReadBuffer.remaining() == 0) {
+        //while (readLength < maxLength) {
+            if (readDecryptedByteBuffer.remaining() == 0) {
                 unwrapResult = unwrap();
             }
-            if (decryptedReadBuffer.remaining() > 0) {
-                int length = Math.min(buffer.length - offset, decryptedReadBuffer.remaining());
-                readLength += length;
-                decryptedReadBuffer.get(buffer, offset, length);
-                offset += length;
+            if (readDecryptedByteBuffer.remaining() > 0) {
+                readLength = Math.min(buffer.length - offset, readDecryptedByteBuffer.remaining());
+                //readLength += length;
+                readDecryptedByteBuffer.get(buffer, offset, readLength);
+                //offset += length;
             }
+        log("readDecrypted length: " + readLength);
             if (readLength == 0 && unwrapResult == -1) {
                 return -1;
             }
-        }
-        log("readDecrypted length: " + readLength);
+        //}
         return readLength;
     }
 
-    private int unwrap() throws IOException {
+    private int unwrap() throws SSLException {
         log("handShakeUnwrap");
         if (readEncryptedByteBuffer.hasRemaining()) {
-            decryptedReadBuffer.clear();
-            SSLEngineResult r = sslEngine.unwrap(readEncryptedByteBuffer, decryptedReadBuffer);
+            readDecryptedByteBuffer.clear();
+            SSLEngineResult r = sslEngine.unwrap(readEncryptedByteBuffer, readDecryptedByteBuffer);
             log("handShakeUnwrap unwrap " + getResultString(r));
             if (r.getStatus() == SSLEngineResult.Status.OK) {
-                decryptedReadBuffer.flip();
+                readDecryptedByteBuffer.flip();
                 return r.bytesProduced();
             } else if (r.getStatus() == SSLEngineResult.Status.BUFFER_UNDERFLOW) {
                 readEncryptedByteBuffer.compact();
@@ -76,51 +78,54 @@ public class SslLayer extends SSLHandShaker implements Closeable {
         } else {
             readEncryptedByteBuffer.clear();
         }
-        int count = readableByteChannel.read(readEncryptedByteBuffer);
-        readEncryptedByteBuffer.flip();
-        log("handShakeUnwrap read " + count);
-        return count == -1 ? -1 : unwrap();
-
+        try {
+            int count = readableByteChannel.read(readEncryptedByteBuffer);
+            readEncryptedByteBuffer.flip();
+            log("handShakeUnwrap read " + count);
+            return count == -1 ? -1 : unwrap();
+        } catch (IOException e) {
+            close();
+            return -1;
+        }
     }
 
     private synchronized void writeDecrypted(byte[] buffer, int offset, final int maxLength) throws IOException {
         checkByteArrayParameters(buffer, offset, maxLength);
+        throwIfClosed();
         if (!isHandShaken()) {
             SSLEngineResult r = handshake();
             log("HandShake done " + getResultString(r));
         }
         int sentLength = 0;
         while (sentLength < maxLength) {
-            if (decryptedWriteByteBuffer.hasRemaining()) {
-                sentLength += decryptedWriteByteBuffer.limit();
-                wrap(decryptedWriteByteBuffer);
+            if (writeDecryptedByteBuffer.hasRemaining()) {
+                sentLength += writeDecryptedByteBuffer.limit();
+                wrap(writeDecryptedByteBuffer);
             } else {
-                decryptedWriteByteBuffer.clear();
-                decryptedWriteByteBuffer.put(buffer, offset,
-                        Math.min(maxLength - sentLength, decryptedWriteByteBuffer.remaining()));
-                decryptedWriteByteBuffer.flip();
+                writeDecryptedByteBuffer.clear();
+                writeDecryptedByteBuffer.put(buffer, offset,
+                        Math.min(maxLength - sentLength, writeDecryptedByteBuffer.remaining()));
+                writeDecryptedByteBuffer.flip();
             }
         }
     }
 
     private void wrap(ByteBuffer byteBuffer) throws IOException {
-        limbo.clear();
-        SSLEngineResult r = sslEngine.wrap(byteBuffer, limbo);
-        limbo.flip();
-        writableByteChannel.write(limbo);
-        limbo.clear();
+        writeEncryptedByteBuffer.clear();
+        SSLEngineResult r = sslEngine.wrap(byteBuffer, writeEncryptedByteBuffer);
+        writeEncryptedByteBuffer.flip();
+        writableByteChannel.write(writeEncryptedByteBuffer);
+        writeEncryptedByteBuffer.clear();
     }
 
-    public synchronized void close() throws IOException {
+    private synchronized void close() {
         log("close");
-//        if (this.isClosed == false) {
-//            this.isClosed = true;
-//            try {
-//                if (this.encryptedInput != null) this.encryptedInput.close();
-//                if (this.encryptedOutput != null) this.encryptedOutput.close();
-//            } catch (Exception x) {
-//            }
-//        }
+        isClosed = true;
+        try {
+            writableByteChannel.close();
+            readableByteChannel.close();
+        } catch (IOException e) {
+        }
     }
 
     private void checkByteArrayParameters(byte[] b, int off, int len) {
@@ -129,6 +134,12 @@ public class SslLayer extends SSLHandShaker implements Closeable {
         } else if (len > b.length - off || off < 0 || len <= 0) {
             throw new IllegalArgumentException("Wrong size requested. Buffer length: " + b.length
                     + " offset: " + off + " maxLength " + len);
+        }
+    }
+
+    private void throwIfClosed() throws IOException {
+        if (isClosed) {
+            throw new IOException("SSL Layer is Closed");
         }
     }
 

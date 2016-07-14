@@ -19,5 +19,14 @@ public class Temporary {
 //        System.out.println(buffer);
         buffer.compact();
         System.out.println(buffer);
+        Integer a = 5;
+        try {
+            a.byteValue();
+        } catch (NullPointerException e) {
+            System.out.println("NullPointerException");
+        } finally {
+            System.out.println("finally");
+        }
+
     }
 }
