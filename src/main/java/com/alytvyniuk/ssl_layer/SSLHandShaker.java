@@ -21,29 +21,26 @@ public abstract class SSLHandShaker {
     private final boolean isClient;
     protected SSLEngine sslEngine;
     protected ByteBuffer limbo;
-    //protected InputStream encryptedInput;
-    //private OutputStream encryptedOutput;
     private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
-    protected ByteBuffer decryptedBuffer;
+    protected ByteBuffer decryptedReadBuffer;
     protected final WritableByteChannel writableByteChannel;
-    private final ReadableByteChannel readableByteChannel;
-
-    protected static final int ENCRYPTED_BUFFER_SIZE = 1500;
-    //protected byte[] readEncryptedBuffer = new byte[ENCRYPTED_BUFFER_SIZE];
-    private final ByteBuffer readEncryptedByteBuffer = ByteBuffer.allocate(ENCRYPTED_BUFFER_SIZE);
+    protected final ReadableByteChannel readableByteChannel;
+    protected final ByteBuffer readEncryptedByteBuffer;
+    protected final ByteBuffer decryptedWriteByteBuffer;
 
     private boolean isHandShakeFinished;
 
     protected SSLHandShaker(SSLEngine sslEngine, InputStream encryptedInput, OutputStream encryptedOutput) {
         this.sslEngine = sslEngine;
-        //this.encryptedInput = encryptedInput;
-        //this.encryptedOutput = encryptedOutput;
         isClient = sslEngine.getUseClientMode();
         SSLSession session = sslEngine.getSession();
         int appBufferMax = session.getApplicationBufferSize();
+        decryptedReadBuffer = ByteBuffer.allocate(appBufferMax + 50);
         int netBufferMax = session.getPacketBufferSize();
-        decryptedBuffer = ByteBuffer.allocate(appBufferMax + 50);
         limbo = ByteBuffer.allocate(netBufferMax);
+        readEncryptedByteBuffer = ByteBuffer.allocate(netBufferMax);
+        decryptedWriteByteBuffer = ByteBuffer.allocate(netBufferMax);
+        decryptedWriteByteBuffer.limit(0);
         writableByteChannel = Channels.newChannel(encryptedOutput);
         readableByteChannel = Channels.newChannel(encryptedInput);
         readEncryptedByteBuffer.limit(0);
@@ -62,9 +59,15 @@ public abstract class SSLHandShaker {
             throw new IOException("Unhandled Status: " + r.getStatus());
         }
         if (r.getHandshakeStatus() == SSLEngineResult.HandshakeStatus.FINISHED) {
-            isHandShakeFinished = true;
+            onHandShakeFinished();
         }
         return r;
+    }
+
+    private void onHandShakeFinished() {
+        isHandShakeFinished = true;
+        decryptedReadBuffer.position(0);
+        decryptedReadBuffer.limit(0);
     }
 
     protected SSLEngineResult continueHandshake(SSLEngineResult r) throws IOException {
@@ -83,19 +86,19 @@ public abstract class SSLHandShaker {
 
     protected SSLEngineResult handShakeWrap() throws IOException {
         log("handShakeWrap");
+        limbo.clear();
         SSLEngineResult r = sslEngine.wrap(EMPTY_BUFFER, limbo);
         limbo.flip();
         log("handShakeWrap write " + limbo.remaining() + " " + getResultString(r));
         writableByteChannel.write(limbo);
         limbo.clear();
-        continueHandshake(r);
-        return r;
+        return continueHandshake(r);
     }
 
     protected SSLEngineResult handShakeUnwrap() throws IOException {
         log("handShakeUnwrap");
         if (readEncryptedByteBuffer.hasRemaining()) {
-            SSLEngineResult r = sslEngine.unwrap(readEncryptedByteBuffer, decryptedBuffer);
+            SSLEngineResult r = sslEngine.unwrap(readEncryptedByteBuffer, decryptedReadBuffer);
             log("handShakeUnwrap unwrap " + getResultString(r));
             return continueHandshake(r);
         } else {
@@ -130,7 +133,7 @@ public abstract class SSLHandShaker {
         System.out.println((isClient ? "Client" : "Server") + " " + message);
     }
 
-    protected boolean isHandShakeFinished() {
+    protected boolean isHandShaken() {
         return isHandShakeFinished;
     }
 }
