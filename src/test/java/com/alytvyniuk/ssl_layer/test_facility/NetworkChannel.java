@@ -13,7 +13,7 @@ public class NetworkChannel {
 
     private final PipedOutputStream mOS;
     private final PipedInputStream mIS;
-    private static final int CHANNEL_SIZE = 8192;
+    private static final int CHANNEL_SIZE = 20000;
 
     public NetworkChannel() throws IOException {
         mOS = new PipedOutputStream();

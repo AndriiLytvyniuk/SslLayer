@@ -31,7 +31,7 @@ public class ServerThread extends Thread {
                 if (count == -1) {
                     return;
                 }
-                String received = new String(mServerBuffer);
+                String received = new String(mServerBuffer, 0, count);
                 Trail.verbose(TAG, "Received " + received);
                 mServerWriteFileOS.write(mServerBuffer, 0, count);
             }

@@ -20,7 +20,6 @@ public abstract class SSLHandShaker {
 
     private final boolean isClient;
     protected SSLEngine sslEngine;
-    private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
     protected final WritableByteChannel writableByteChannel;
     protected final ReadableByteChannel readableByteChannel;
     protected final ByteBuffer writeEncryptedByteBuffer;
@@ -72,7 +71,6 @@ public abstract class SSLHandShaker {
     }
 
     protected SSLEngineResult continueHandshake(SSLEngineResult r) throws IOException {
-        log("continueHandshake " + getResultString(r));
         switch (r.getHandshakeStatus()) {
             case NEED_TASK:
                 return handShakeDoTask();
@@ -88,7 +86,7 @@ public abstract class SSLHandShaker {
     protected SSLEngineResult handShakeWrap() throws IOException {
         log("handShakeWrap");
         writeEncryptedByteBuffer.clear();
-        SSLEngineResult r = sslEngine.wrap(EMPTY_BUFFER, writeEncryptedByteBuffer);
+        SSLEngineResult r = sslEngine.wrap(writeDecryptedByteBuffer, writeEncryptedByteBuffer);
         writeEncryptedByteBuffer.flip();
         log("handShakeWrap write " + writeEncryptedByteBuffer.remaining() + " " + getResultString(r));
         writableByteChannel.write(writeEncryptedByteBuffer);
@@ -106,12 +104,10 @@ public abstract class SSLHandShaker {
             readEncryptedByteBuffer.clear();
             int count = readableByteChannel.read(readEncryptedByteBuffer);
             readEncryptedByteBuffer.flip();
-            // = encryptedInput.read(readEncryptedBuffer, 0, readEncryptedBuffer.length);
             log("handShakeUnwrap read " + count);
             if (count == -1) {
                 throw new IOException("Not enough data from network for handshake");
             }
-            //readEncryptedByteBuffer.put(readEncryptedBuffer, 0, count);
             return handShakeUnwrap();
         }
     }
@@ -136,5 +132,15 @@ public abstract class SSLHandShaker {
 
     protected boolean isHandShaken() {
         return isHandShakeFinished;
+    }
+
+    protected synchronized void close() {
+        log("close");
+        isClosed = true;
+        try {
+            writableByteChannel.close();
+            readableByteChannel.close();
+        } catch (IOException e) {
+        }
     }
 }

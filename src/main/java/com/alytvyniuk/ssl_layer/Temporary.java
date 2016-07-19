@@ -1,6 +1,7 @@
 package com.alytvyniuk.ssl_layer;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 /**
  * Created by andrii on 14.07.16.
@@ -8,25 +9,18 @@ import java.nio.ByteBuffer;
 public class Temporary {
 
     public static void main(String[] args) {
-        ByteBuffer buffer = ByteBuffer.allocate(40);
-        buffer.putLong(80L);
-        buffer.putLong(80L);
-        buffer.putLong(80L);
+        ByteBuffer buffer = ByteBuffer.allocate(5);
+        buffer.put((byte)2);
+        buffer.put((byte)3);
+        buffer.put((byte)4);
         buffer.flip();
-        System.out.println(buffer);
+        System.out.println(buffer + " " + Arrays.toString(buffer.array()));
 //        buffer.get();
-//        buffer.get();
+        buffer.get();
 //        System.out.println(buffer);
         buffer.compact();
-        System.out.println(buffer);
-        Integer a = 5;
-        try {
-            a.byteValue();
-        } catch (NullPointerException e) {
-            System.out.println("NullPointerException");
-        } finally {
-            System.out.println("finally");
-        }
+        System.out.println(buffer + " " + Arrays.toString(buffer.array()));
+        System.out.println(buffer.get() + " " + buffer.get());
 
     }
 }

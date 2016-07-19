@@ -37,8 +37,8 @@ public abstract class BaseTest {
                 serverToClientChannel.getInputStream(),
                 clientToServerChannel.getOutputStream());
 
-        Thread clientThread = new ClientThread(clientSslConverter.getOutputStream(), requestFile, mClientSentFile);
-        Thread serverThread = new ServerThread(serverSslConverter.getInputStream(), mServerReceivedFile, serverBufferSize);
+        Thread clientThread = new ClientThread(clientSslConverter.getDecryptedOutputStream(), requestFile, mClientSentFile);
+        Thread serverThread = new ServerThread(serverSslConverter.getDecryptedInputStream(), mServerReceivedFile, serverBufferSize);
 
         clientThread.start();
         serverThread.start();

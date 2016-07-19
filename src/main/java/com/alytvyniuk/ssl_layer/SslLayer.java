@@ -1,10 +1,9 @@
 package com.alytvyniuk.ssl_layer;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
@@ -20,22 +19,14 @@ public class SslLayer extends SSLHandShaker {
         readEncryptedByteBuffer.limit(0);
     }
 
-    public InputStream getInputStream() {
+    public InputStream getDecryptedInputStream() {
         return decryptedInputStream;
     }
 
-    public OutputStream getOutputStream() {
+    public OutputStream getDecryptedOutputStream() {
         return decryptedOutputStream;
     }
 
-    /**
-     * Reads data to buffer
-     * @param buffer
-     * @param offset
-     * @param maxLength
-     * @return size of read bytes or -1 if nothing to read
-     * @throws IOException
-     */
     private synchronized int readDecrypted(byte[] buffer, int offset, final int maxLength) throws IOException {
         checkByteArrayParameters(buffer, offset, maxLength);
         throwIfClosed();
@@ -45,30 +36,23 @@ public class SslLayer extends SSLHandShaker {
         }
         int readLength = 0;
         int unwrapResult = -1;
-        //while (readLength < maxLength) {
-            if (readDecryptedByteBuffer.remaining() == 0) {
-                unwrapResult = unwrap();
-            }
-            if (readDecryptedByteBuffer.remaining() > 0) {
-                readLength = Math.min(buffer.length - offset, readDecryptedByteBuffer.remaining());
-                //readLength += length;
-                readDecryptedByteBuffer.get(buffer, offset, readLength);
-                //offset += length;
-            }
+        if (readDecryptedByteBuffer.remaining() == 0) {
+            unwrapResult = unwrap();
+        }
+        if (readDecryptedByteBuffer.remaining() > 0) {
+            readLength = Math.min(buffer.length - offset, readDecryptedByteBuffer.remaining());
+            readDecryptedByteBuffer.get(buffer, offset, readLength);
+        }
         log("readDecrypted length: " + readLength);
-            if (readLength == 0 && unwrapResult == -1) {
-                return -1;
-            }
-        //}
-        return readLength;
+        return readLength == 0 && unwrapResult == -1 ? -1 : readLength;
     }
 
     private int unwrap() throws SSLException {
-        log("handShakeUnwrap");
+        log("Unwrap");
         if (readEncryptedByteBuffer.hasRemaining()) {
             readDecryptedByteBuffer.clear();
             SSLEngineResult r = sslEngine.unwrap(readEncryptedByteBuffer, readDecryptedByteBuffer);
-            log("handShakeUnwrap unwrap " + getResultString(r));
+            log("unwrap " + getResultString(r));
             if (r.getStatus() == SSLEngineResult.Status.OK) {
                 readDecryptedByteBuffer.flip();
                 return r.bytesProduced();
@@ -81,7 +65,7 @@ public class SslLayer extends SSLHandShaker {
         try {
             int count = readableByteChannel.read(readEncryptedByteBuffer);
             readEncryptedByteBuffer.flip();
-            log("handShakeUnwrap read " + count);
+            log("Unwrap read " + count);
             return count == -1 ? -1 : unwrap();
         } catch (IOException e) {
             close();
@@ -90,6 +74,7 @@ public class SslLayer extends SSLHandShaker {
     }
 
     private synchronized void writeDecrypted(byte[] buffer, int offset, final int maxLength) throws IOException {
+        log("Wrap");
         checkByteArrayParameters(buffer, offset, maxLength);
         throwIfClosed();
         if (!isHandShaken()) {
@@ -100,7 +85,8 @@ public class SslLayer extends SSLHandShaker {
         while (sentLength < maxLength) {
             if (writeDecryptedByteBuffer.hasRemaining()) {
                 sentLength += writeDecryptedByteBuffer.limit();
-                wrap(writeDecryptedByteBuffer);
+                offset += sentLength;
+                wrap();
             } else {
                 writeDecryptedByteBuffer.clear();
                 writeDecryptedByteBuffer.put(buffer, offset,
@@ -110,21 +96,14 @@ public class SslLayer extends SSLHandShaker {
         }
     }
 
-    private void wrap(ByteBuffer byteBuffer) throws IOException {
-        writeEncryptedByteBuffer.clear();
-        SSLEngineResult r = sslEngine.wrap(byteBuffer, writeEncryptedByteBuffer);
-        writeEncryptedByteBuffer.flip();
-        writableByteChannel.write(writeEncryptedByteBuffer);
-        writeEncryptedByteBuffer.clear();
-    }
-
-    private synchronized void close() {
-        log("close");
-        isClosed = true;
-        try {
-            writableByteChannel.close();
-            readableByteChannel.close();
-        } catch (IOException e) {
+    private void wrap() throws IOException {
+        while (writeDecryptedByteBuffer.hasRemaining()) {
+            log("wrap " + writeDecryptedByteBuffer.remaining());
+            SSLEngineResult r = sslEngine.wrap(writeDecryptedByteBuffer, writeEncryptedByteBuffer);
+            writeEncryptedByteBuffer.flip();
+            log("write " + getResultString(r) + " written: " + writeEncryptedByteBuffer.remaining() + ", left " + writeDecryptedByteBuffer.remaining());
+            writableByteChannel.write(writeEncryptedByteBuffer);
+            writeEncryptedByteBuffer.clear();
         }
     }
 
@@ -149,9 +128,7 @@ public class SslLayer extends SSLHandShaker {
         @Override
         public int read() throws IOException {
             int count = readDecrypted(singleByte, 0, 1);
-            if (count == -1) return -1;
-            else if (count != 1) throw new IOException("Unexpected read count: " + count);
-            return singleByte[0];
+            return count == 1 ? singleByte[0] : -1;
         }
 
         @Override
