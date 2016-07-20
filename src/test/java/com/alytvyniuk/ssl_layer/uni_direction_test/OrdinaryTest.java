@@ -1,4 +1,4 @@
-package com.alytvyniuk.ssl_layer;
+package com.alytvyniuk.ssl_layer.uni_direction_test;
 
 import org.junit.Test;
 

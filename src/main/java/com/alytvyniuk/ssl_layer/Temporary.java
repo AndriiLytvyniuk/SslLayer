@@ -22,5 +22,7 @@ public class Temporary {
         System.out.println(buffer + " " + Arrays.toString(buffer.array()));
         System.out.println(buffer.get() + " " + buffer.get());
 
+        String st = "1";
+        System.out.println(Arrays.toString(st.getBytes()));
     }
 }

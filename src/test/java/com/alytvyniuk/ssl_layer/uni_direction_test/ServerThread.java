@@ -1,4 +1,4 @@
-package com.alytvyniuk.ssl_layer.test_facility;
+package com.alytvyniuk.ssl_layer.uni_direction_test;
 
 import com.mauriciotogneri.trail.Trail;
 

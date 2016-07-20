@@ -1,10 +1,9 @@
-package com.alytvyniuk.ssl_layer;
+package com.alytvyniuk.ssl_layer.uni_direction_test;
 
 
-import com.alytvyniuk.ssl_layer.test_facility.ClientThread;
+import com.alytvyniuk.ssl_layer.SslLayer;
 import com.alytvyniuk.ssl_layer.test_facility.NetworkChannel;
 import com.alytvyniuk.ssl_layer.test_facility.SSLContextProvider;
-import com.alytvyniuk.ssl_layer.test_facility.ServerThread;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.Assert;
