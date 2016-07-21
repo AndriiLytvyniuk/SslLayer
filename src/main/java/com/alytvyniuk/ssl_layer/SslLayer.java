@@ -1,28 +1,82 @@
+/*
+ * #%L
+ * SslLayer
+ * %%
+ * Copyright (C) 2012 - 2016 LocationProvider
+ * %%
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the LocationProvider nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software without
+ *    specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGE.
+ * #L%
+ */
 package com.alytvyniuk.ssl_layer;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Arrays;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 
+/**
+ * Class that performs all operations related to single SSL connection.
+ * It requires:
+ * 1) I/O with encrypted data from one side: ({@link SSLHandShaker#readEncryptedChannel} and {@link SSLHandShaker#writeEncryptedChannel})
+ * 2) I/O with decrypted data from other ({@link #decryptedInputStream} and {@link #decryptedOutputStream})
+ * 3) {@link SSLEngine}, client or server
+ * It provides one session connection: handshake + data exchange.
+ * After SslLayer is connected, just try to write or receive information from decrypted channels,
+ * all handshake operations will be performed automatically. If handshake is not successful, SSLException will be thrown
+ */
 public class SslLayer extends SSLHandShaker {
 
     private final InputStream decryptedInputStream = new DecryptedInputStream();
     private final OutputStream decryptedOutputStream = new DecryptedOutputStream();
 
+    /**
+     * Constructor for SslLayer
+     * @param sslEngine client or server type. supplied with all needed Trust and Key Managers
+     *                 If configured incorrectly, SSLException will be thrown
+     * @param encryptedInput InputStream with encrypted data
+     * @param encryptedOutput OutputStream for encrypted data
+     */
     public SslLayer(SSLEngine sslEngine, InputStream encryptedInput, OutputStream encryptedOutput) {
         super(sslEngine, encryptedInput, encryptedOutput);
         readEncryptedByteBuffer.limit(0);
     }
 
+    /**
+     * @return InputStream with decrypted data
+     */
     public InputStream getDecryptedInputStream() {
         return decryptedInputStream;
     }
 
+    /**
+     * @return OutputStream for decrypted data
+     */
     public OutputStream getDecryptedOutputStream() {
         return decryptedOutputStream;
     }
@@ -63,7 +117,7 @@ public class SslLayer extends SSLHandShaker {
             readEncryptedByteBuffer.clear();
         }
         try {
-            int count = readableByteChannel.read(readEncryptedByteBuffer);
+            int count = readEncryptedChannel.read(readEncryptedByteBuffer);
             readEncryptedByteBuffer.flip();
             log("Unwrap read " + count);
             return count == -1 ? -1 : unwrap();
@@ -102,7 +156,7 @@ public class SslLayer extends SSLHandShaker {
             SSLEngineResult r = sslEngine.wrap(writeDecryptedByteBuffer, writeEncryptedByteBuffer);
             writeEncryptedByteBuffer.flip();
             log("write " + getResultString(r) + " written: " + writeEncryptedByteBuffer.remaining() + ", left " + writeDecryptedByteBuffer.remaining());
-            writableByteChannel.write(writeEncryptedByteBuffer);
+            writeEncryptedChannel.write(writeEncryptedByteBuffer);
             writeEncryptedByteBuffer.clear();
         }
     }

@@ -41,13 +41,13 @@ import java.io.IOException;
 /**
  * Created by andrii on 12.07.16.
  */
-public class SimpleUnidirectionalTest extends BaseTest {
+public class LongMessageBidirectionalTest extends BaseTest {
 
     private static final String KEY_DIRECTORY = "src/test/res/ssl_converter_test/keys/ssl_proxy.jks";
     private static final String KEY_PASSWORD = "ssl_proxy";
-    private static final String REQUEST_FILE_PATH = "src/test/res/ssl_converter_test/requests/request";
-    private static final String RESPONSE_FILE_PATH = null;
-    private static final boolean IS_BIDIRECTIONAL = false;
+    private static final String REQUEST_FILE_PATH = "src/test/res/ssl_converter_test/requests/long_message_request";
+    private static final String RESPONSE_FILE_PATH = "src/test/res/ssl_converter_test/requests/long_message_request";
+    private static final boolean IS_BIDIRECTIONAL = true;
 
     @Test
     public void test() throws IOException {
@@ -57,12 +57,15 @@ public class SimpleUnidirectionalTest extends BaseTest {
 
     @Override
     protected void onConnectionFinished() {
-        boolean isEqual = false;
+        boolean isForwardEqual = false;
+        boolean isBackwardEqual = false;
         try {
-            isEqual = FileUtils.contentEquals(mClientSentFile, mServerReceivedFile);
+            isForwardEqual = FileUtils.contentEquals(mClientSentFile, mServerReceivedFile);
+            isBackwardEqual = FileUtils.contentEquals(mServerSentFile, mClientReceivedFile);
         } catch (IOException e) {
             e.printStackTrace();
         }
-        Assert.assertTrue(isEqual);
+        Assert.assertTrue(isForwardEqual);
+        Assert.assertTrue(isBackwardEqual);
     }
 }

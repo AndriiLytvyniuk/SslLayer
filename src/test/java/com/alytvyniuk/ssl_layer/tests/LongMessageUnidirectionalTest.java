@@ -41,11 +41,11 @@ import java.io.IOException;
 /**
  * Created by andrii on 12.07.16.
  */
-public class SimpleUnidirectionalTest extends BaseTest {
+public class LongMessageUnidirectionalTest extends BaseTest {
 
     private static final String KEY_DIRECTORY = "src/test/res/ssl_converter_test/keys/ssl_proxy.jks";
     private static final String KEY_PASSWORD = "ssl_proxy";
-    private static final String REQUEST_FILE_PATH = "src/test/res/ssl_converter_test/requests/request";
+    private static final String REQUEST_FILE_PATH = "src/test/res/ssl_converter_test/requests/long_message_request";
     private static final String RESPONSE_FILE_PATH = null;
     private static final boolean IS_BIDIRECTIONAL = false;
 
