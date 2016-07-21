@@ -1,10 +1,15 @@
-package com.alytvyniuk.ssl_layer.bidirectional_test;
+package com.alytvyniuk.ssl_layer.tests;
 
 
 import com.alytvyniuk.ssl_layer.SslLayer;
+import com.alytvyniuk.ssl_layer.test_facility.ClientThread;
 import com.alytvyniuk.ssl_layer.test_facility.NetworkChannel;
 import com.alytvyniuk.ssl_layer.test_facility.SSLContextProvider;
+import com.alytvyniuk.ssl_layer.test_facility.ServerThread;
+import com.mauriciotogneri.trail.Trail;
 
+import org.apache.commons.io.FileUtils;
+import org.junit.After;
 import org.junit.Before;
 
 import java.io.File;
@@ -13,6 +18,8 @@ import java.io.IOException;
 
 public abstract class BaseTest {
 
+    private static final String BASE_TEST_DIR = "src/test/testResults/";
+    private File mTestDir;
     protected File mServerSentFile;
     protected File mServerReceivedFile;
     protected File mClientSentFile;
@@ -23,15 +30,20 @@ public abstract class BaseTest {
 
     private SSLContextProvider mSSLContextProvider;
 
-    protected void init(String baseDir, boolean isBidirectional, String keyPath, String keypass,
+    protected void init(boolean isBidirectional, String keyPath, String keypass,
                         String requestFilePath, String responseFilePath) throws IOException {
-        mServerReceivedFile = new File(baseDir + "serverReceived");
-        mClientSentFile = new File(baseDir + "clientSent");
+        mTestDir = new File(BASE_TEST_DIR + getClass().getSimpleName());
+        if (!mTestDir.exists()) {
+            mTestDir.mkdirs();
+        }
+
+        mServerReceivedFile = new File(mTestDir, "serverReceived");
+        mClientSentFile = new File(mTestDir, "clientSent");
         mServerReceivedFile.createNewFile();
         mClientSentFile.createNewFile();
         if (isBidirectional) {
-            mServerSentFile = new File(baseDir + "serverSent");
-            mClientReceivedFile = new File(baseDir + "clientReceived");
+            mServerSentFile = new File(mTestDir, "serverSent");
+            mClientReceivedFile = new File(mTestDir, "clientReceived");
             mServerSentFile.createNewFile();
             mClientReceivedFile.createNewFile();
         } else {
@@ -54,7 +66,7 @@ public abstract class BaseTest {
         }
     }
 
-    protected void runRequest(int serverBufferSize) throws IOException {
+    protected void runRequest() throws IOException {
         NetworkChannel serverToClientChannel = new NetworkChannel();
         NetworkChannel clientToServerChannel = new NetworkChannel();
 
@@ -78,11 +90,18 @@ public abstract class BaseTest {
             e.printStackTrace();
         }
         onConnectionFinished();
+
     }
 
     protected abstract void onConnectionFinished();
 
     @Before
-    public void before() throws IOException {
+    public void printName() {
+        Trail.debug(getClass().getSimpleName());
+    }
+
+    @After
+    public void cleanup() throws IOException {
+        FileUtils.deleteDirectory(mTestDir);
     }
 }

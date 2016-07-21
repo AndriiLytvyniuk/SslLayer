@@ -1,31 +1,29 @@
-package com.alytvyniuk.ssl_layer.uni_direction_test;
+package com.alytvyniuk.ssl_layer.test_facility;
 
-import com.mauriciotogneri.trail.Trail;
+import com.alytvyniuk.ssl_layer.SslLayer;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 
 /**
  * Created by alytvyniuk on 28.01.16.
  */
-public class ClientThread extends Thread {
+public class ClientThread extends BaseThread {
 
     private static final String TAG = "ClientThread";
     private final BufferedReader mRequestIS;
-    private final OutputStream mClientWriteFileOS;
-    private final OutputStream mChannelOS;
+    private static final int DEFAULT_SERVER_BUFFER_SIZE = 1024;
+    private byte [] mReceiveBuffer = new byte[DEFAULT_SERVER_BUFFER_SIZE];
+    private boolean mIsBidirectional;
 
-    public ClientThread(OutputStream channelOS, File request, File clientWriteFile) throws FileNotFoundException {
-        super(ClientThread.class.getSimpleName());
+    public ClientThread(SslLayer sslLayer, File request, File sentFile, File receivedFile, boolean isBidirectional) throws FileNotFoundException {
+        super(ClientThread.class.getSimpleName(), sslLayer, sentFile, receivedFile);
         mRequestIS = new BufferedReader(new InputStreamReader(new FileInputStream(request)));
-        mClientWriteFileOS = new FileOutputStream(clientWriteFile);
-        mChannelOS = channelOS;
+        mIsBidirectional = isBidirectional;
     }
 
     @Override
@@ -40,9 +38,14 @@ public class ClientThread extends Thread {
                 }
                 line = line.concat(System.lineSeparator());
                 byte[] data = line.getBytes();
-                mChannelOS.write(data, 0, data.length);
-                mClientWriteFileOS.write(data, 0, data.length);
-                Trail.verbose(TAG, "Sent " + new String(data));
+                write(data);
+                if (mIsBidirectional) {
+                    read(mReceiveBuffer);
+                }
+            }
+            write(GOODBYE.getBytes());
+            if (mIsBidirectional) {
+                read(mReceiveBuffer);
             }
             mChannelOS.close();
         } catch (IOException e) {

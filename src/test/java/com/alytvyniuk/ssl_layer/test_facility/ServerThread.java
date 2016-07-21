@@ -1,4 +1,4 @@
-package com.alytvyniuk.ssl_layer.bidirectional_test;
+package com.alytvyniuk.ssl_layer.test_facility;
 
 import com.alytvyniuk.ssl_layer.SslLayer;
 
@@ -13,12 +13,13 @@ public class ServerThread extends BaseThread {
 
     private static final String TAG = "ServerThread";
     private final BufferedReader mResponseIS;
+    private static final String DEFAULT_RESPONSE = "DEFAULT_RESPONSE";
     private static final int DEFAULT_SERVER_BUFFER_SIZE = 1024;
     private byte [] mReceiveBuffer = new byte[DEFAULT_SERVER_BUFFER_SIZE];
     private boolean mIsBidirectional;
 
     public ServerThread(SslLayer sslLayer, File response, File sentFile, File receivedFile, boolean isBidirectional) throws FileNotFoundException {
-        super(ClientThread.class.getSimpleName(), sslLayer, sentFile, receivedFile);
+        super(ServerThread.class.getSimpleName(), sslLayer, sentFile, receivedFile);
         mResponseIS = response != null
                 ? new BufferedReader(new InputStreamReader(new FileInputStream(response)))
                 : null;
@@ -55,7 +56,7 @@ public class ServerThread extends BaseThread {
                     }
                 }
                 if (line == null) {
-                    line = "DEFAULT RESPONSE";
+                    line = DEFAULT_RESPONSE;
                 }
                 if (isGoodbyeReceived) {
                     line = GOODBYE;
@@ -65,6 +66,11 @@ public class ServerThread extends BaseThread {
                 write(data);
                 break;
             }
+        } else {
+            String line = DEFAULT_RESPONSE;
+            line = line.concat(System.lineSeparator());
+            byte[] data = line.getBytes();
+            write(data);
         }
     }
 }
