@@ -106,7 +106,7 @@ public class SslLayer extends SSLHandShaker {
         if (readEncryptedByteBuffer.hasRemaining()) {
             readDecryptedByteBuffer.clear();
             SSLEngineResult r = sslEngine.unwrap(readEncryptedByteBuffer, readDecryptedByteBuffer);
-            log("unwrap " + getResultString(r));
+            log("unwrap done" + getResultString(r));
             if (r.getStatus() == SSLEngineResult.Status.OK) {
                 readDecryptedByteBuffer.flip();
                 return r.bytesProduced();
@@ -119,7 +119,7 @@ public class SslLayer extends SSLHandShaker {
         try {
             int count = readEncryptedChannel.read(readEncryptedByteBuffer);
             readEncryptedByteBuffer.flip();
-            log("Unwrap read " + count);
+            log("read " + count);
             return count == -1 ? -1 : unwrap();
         } catch (IOException e) {
             close();
@@ -128,7 +128,6 @@ public class SslLayer extends SSLHandShaker {
     }
 
     private synchronized void writeDecrypted(byte[] buffer, int offset, final int maxLength) throws IOException {
-        log("Wrap");
         checkByteArrayParameters(buffer, offset, maxLength);
         throwIfClosed();
         if (!isHandShaken()) {
@@ -151,11 +150,12 @@ public class SslLayer extends SSLHandShaker {
     }
 
     private void wrap() throws IOException {
+        log("Wrap");
         while (writeDecryptedByteBuffer.hasRemaining()) {
-            log("wrap " + writeDecryptedByteBuffer.remaining());
             SSLEngineResult r = sslEngine.wrap(writeDecryptedByteBuffer, writeEncryptedByteBuffer);
+            log("wrap done" + getResultString(r));
             writeEncryptedByteBuffer.flip();
-            log("write " + getResultString(r) + " written: " + writeEncryptedByteBuffer.remaining() + ", left " + writeDecryptedByteBuffer.remaining());
+            log("write " + writeEncryptedByteBuffer.remaining() + ", left " + writeDecryptedByteBuffer.remaining());
             writeEncryptedChannel.write(writeEncryptedByteBuffer);
             writeEncryptedByteBuffer.clear();
         }

@@ -35,9 +35,8 @@ package com.alytvyniuk.ssl_layer.tests;
 import com.alytvyniuk.ssl_layer.SslLayer;
 import com.alytvyniuk.ssl_layer.test_facility.ClientThread;
 import com.alytvyniuk.ssl_layer.test_facility.NetworkChannel;
-import com.alytvyniuk.ssl_layer.test_facility.SSLContextProvider;
 import com.alytvyniuk.ssl_layer.test_facility.ServerThread;
-import com.mauriciotogneri.trail.Trail;
+import com.alytvyniuk.ssl_layer.test_facility.SslContextProvider;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
@@ -46,7 +45,9 @@ import org.junit.Before;
 import java.io.File;
 import java.io.IOException;
 
-
+/**
+ * Base class for testing
+ */
 public abstract class BaseTest {
 
     private static final String BASE_TEST_DIR = "src/test/testResults/";
@@ -59,9 +60,9 @@ public abstract class BaseTest {
     protected File mRequestFile;
     protected File mResponseFile;
 
-    private SSLContextProvider mSSLContextProvider;
+    private SslContextProvider mSslContextProvider;
 
-    protected void init(boolean isBidirectional, String keyPath, String keypass,
+    protected void init(boolean isBidirectional, SslContextProvider sslContextProvider,
                         String requestFilePath, String responseFilePath) throws IOException {
         mTestDir = new File(BASE_TEST_DIR + getClass().getSimpleName());
         if (!mTestDir.exists()) {
@@ -82,7 +83,7 @@ public abstract class BaseTest {
             mClientReceivedFile = null;
         }
         mIsBidirectional = isBidirectional;
-        mSSLContextProvider = new SSLContextProvider(keyPath, keypass);
+        mSslContextProvider = sslContextProvider;
 
         mRequestFile = new File(requestFilePath);
         if (!mRequestFile.exists()) {
@@ -101,11 +102,11 @@ public abstract class BaseTest {
         NetworkChannel serverToClientChannel = new NetworkChannel();
         NetworkChannel clientToServerChannel = new NetworkChannel();
 
-        SslLayer clientSslLayer = new SslLayer(mSSLContextProvider.getClientSSLEngine(),
+        SslLayer clientSslLayer = new SslLayer(mSslContextProvider.getClientSSLEngine(),
                 clientToServerChannel.getInputStream(),
                 serverToClientChannel.getOutputStream());
 
-        SslLayer serverSslLayer = new SslLayer(mSSLContextProvider.getServerSSLEngine(),
+        SslLayer serverSslLayer = new SslLayer(mSslContextProvider.getServerSSLEngine(),
                 serverToClientChannel.getInputStream(),
                 clientToServerChannel.getOutputStream());
 
@@ -121,14 +122,13 @@ public abstract class BaseTest {
             e.printStackTrace();
         }
         onConnectionFinished();
-
     }
 
     protected abstract void onConnectionFinished();
 
     @Before
     public void printName() {
-        Trail.debug(getClass().getSimpleName());
+        System.out.println(getClass().getSimpleName());
     }
 
     @After

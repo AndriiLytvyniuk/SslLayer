@@ -32,6 +32,9 @@
  */
 package com.alytvyniuk.ssl_layer.tests;
 
+import com.alytvyniuk.ssl_layer.test_facility.BksSslContextProvider;
+import com.alytvyniuk.ssl_layer.test_facility.SslContextProvider;
+
 import org.apache.commons.io.FileUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -39,19 +42,22 @@ import org.junit.Test;
 import java.io.IOException;
 
 /**
- * Created by andrii on 12.07.16.
+ * Sends several messages forward.
  */
 public class SimpleUnidirectionalTest extends BaseTest {
 
-    private static final String KEY_DIRECTORY = "src/test/res/ssl_converter_test/keys/ssl_proxy.jks";
-    private static final String KEY_PASSWORD = "ssl_proxy";
+    private static final String KEY_DIRECTORY = "src/test/res/ssl_converter_test/keys/bks_test_key.bks";
+    private static final String KEY_STORE_PASSWORD = "ssllayer";
+    private static final String KEY_PASSWORD = "123456";
+
     private static final String REQUEST_FILE_PATH = "src/test/res/ssl_converter_test/requests/request";
     private static final String RESPONSE_FILE_PATH = null;
     private static final boolean IS_BIDIRECTIONAL = false;
 
     @Test
     public void test() throws IOException {
-        init(IS_BIDIRECTIONAL, KEY_DIRECTORY, KEY_PASSWORD, REQUEST_FILE_PATH, RESPONSE_FILE_PATH);
+        SslContextProvider provider = new BksSslContextProvider(KEY_DIRECTORY, KEY_STORE_PASSWORD, KEY_PASSWORD);
+        init(IS_BIDIRECTIONAL, provider, REQUEST_FILE_PATH, RESPONSE_FILE_PATH);
         runRequest();
     }
 

@@ -33,7 +33,6 @@
 package com.alytvyniuk.ssl_layer.test_facility;
 
 import com.alytvyniuk.ssl_layer.SslLayer;
-import com.mauriciotogneri.trail.Trail;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -80,7 +79,7 @@ public abstract class BaseThread extends Thread {
             }
             readLength += count;
             String received = new String(buffer, 0, count);
-            Trail.verbose(TAG, "Received " + received);
+            System.out.println(TAG + " Received " + received);
             if (mReceiveWriteFileOS != null) {
                 mReceiveWriteFileOS.write(buffer, 0, count);
             }
@@ -99,6 +98,6 @@ public abstract class BaseThread extends Thread {
         if (mSentWriteFileOS != null) {
             mSentWriteFileOS.write(buffer, 0, buffer.length);
         }
-        Trail.verbose(TAG, "Sent " + new String(buffer));
+        System.out.println(TAG + " Sent " + new String(buffer));
     }
 }

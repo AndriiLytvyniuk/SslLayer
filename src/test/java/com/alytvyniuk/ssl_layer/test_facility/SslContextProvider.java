@@ -30,46 +30,35 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  * #L%
  */
-package com.alytvyniuk.ssl_layer.tests;
+package com.alytvyniuk.ssl_layer.test_facility;
 
-import com.alytvyniuk.ssl_layer.test_facility.JksSslContextProvider;
-import com.alytvyniuk.ssl_layer.test_facility.SslContextProvider;
-
-import org.apache.commons.io.FileUtils;
-import org.junit.Assert;
-import org.junit.Test;
-
-import java.io.IOException;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 
 /**
- * Sends message of about 20k to server and back.
+ * Created by alytvyniuk on 28.01.16.
  */
-public class LongMessageBidirectionalTest extends BaseTest {
+public abstract class SslContextProvider {
 
-    private static final String KEY_DIRECTORY = "src/test/res/ssl_converter_test/keys/ssllayer.jks";
-    private static final String KEY_PASSWORD = "ssllayer";
-    private static final String REQUEST_FILE_PATH = "src/test/res/ssl_converter_test/requests/long_message_request";
-    private static final String RESPONSE_FILE_PATH = "src/test/res/ssl_converter_test/requests/long_message_request";
-    private static final boolean IS_BIDIRECTIONAL = true;
+    private SSLContext mSSLContext;
 
-    @Test
-    public void test() throws IOException {
-        SslContextProvider provider = new JksSslContextProvider(KEY_DIRECTORY, KEY_PASSWORD, KEY_PASSWORD);
-        init(IS_BIDIRECTIONAL, provider, REQUEST_FILE_PATH, RESPONSE_FILE_PATH);
-        runRequest();
+    public SslContextProvider(String keyFilePath, String keyStorePassword, String keyPassword) {
+        mSSLContext = initSSLContext(keyFilePath, keyStorePassword, keyPassword);
     }
 
-    @Override
-    protected void onConnectionFinished() {
-        boolean isForwardEqual = false;
-        boolean isBackwardEqual = false;
-        try {
-            isForwardEqual = FileUtils.contentEquals(mClientSentFile, mServerReceivedFile);
-            isBackwardEqual = FileUtils.contentEquals(mServerSentFile, mClientReceivedFile);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        Assert.assertTrue(isForwardEqual);
-        Assert.assertTrue(isBackwardEqual);
+    protected abstract SSLContext initSSLContext(String keyFilePath, String keyStorePassword, String keyPassword);
+
+    public SSLEngine getServerSSLEngine() {
+        SSLEngine engine = mSSLContext.createSSLEngine();
+        engine.setUseClientMode(false);
+        engine.setNeedClientAuth(false);
+        engine.setWantClientAuth(false);
+        return engine;
+    }
+
+    public SSLEngine getClientSSLEngine() {
+        SSLEngine engine = mSSLContext.createSSLEngine("client", 8080);
+        engine.setUseClientMode(true);
+        return engine;
     }
 }

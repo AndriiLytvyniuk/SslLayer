@@ -32,58 +32,43 @@
  */
 package com.alytvyniuk.ssl_layer.test_facility;
 
+import org.spongycastle.jce.provider.BouncyCastleProvider;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.security.KeyStore;
+import java.security.Security;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManagerFactory;
 
 /**
- * Created by alytvyniuk on 28.01.16.
+ * Provides {@link SSLContext} for Spongy Castle Provider
  */
-public class SSLContextProvider {
+@Deprecated
+public class ScBksSslContextProvider extends SslContextProvider {
 
-    private SSLContext mSSLContext;
-
-    public SSLContextProvider(String keyFilePath, String password) {
-        mSSLContext = initSSLContext(keyFilePath, password);
+    public ScBksSslContextProvider(String keyFilePath, String keyStorePassword, String keyPassword) {
+        super(keyFilePath, keyStorePassword, keyPassword);
     }
 
-    private SSLContext initSSLContext(String keyFilePath, String password) {
+    @Override
+    protected SSLContext initSSLContext(String keyFilePath, String keyStorePassword, String keyPassword) {
         try {
-            //Security.insertProviderAt(new BouncyCastleProvider(), 1);
-            KeyStore keystore = KeyStore.getInstance("JKS");
-            char[] passphrase = password.toCharArray();
+            Security.insertProviderAt(new BouncyCastleProvider(), 1);
+            KeyStore keystore = KeyStore.getInstance("BKS", "SC");
             File keyStoreFile = new File(keyFilePath);
-            keystore.load(new FileInputStream(keyStoreFile), passphrase);
+            keystore.load(new FileInputStream(keyStoreFile), keyStorePassword.toCharArray());
             TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             trustManagerFactory.init(keystore);
             KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-            keyManagerFactory.init(keystore, password.toCharArray());
+            keyManagerFactory.init(keystore, keyPassword.toCharArray());
             SSLContext sslContext = SSLContext.getInstance("TLS");
             sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null);
             return sslContext;
-
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
-        return null;
-    }
-
-    public SSLEngine getServerSSLEngine() {
-        SSLEngine engine = mSSLContext.createSSLEngine();
-        engine.setUseClientMode(false);
-        engine.setNeedClientAuth(false);
-        engine.setWantClientAuth(false);
-        return engine;
-    }
-
-    public SSLEngine getClientSSLEngine() {
-        SSLEngine engine = mSSLContext.createSSLEngine("client", 8080);
-        engine.setUseClientMode(true);
-        return engine;
     }
 }
