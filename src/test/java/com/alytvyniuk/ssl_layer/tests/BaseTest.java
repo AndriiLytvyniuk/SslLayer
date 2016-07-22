@@ -39,7 +39,6 @@ import com.alytvyniuk.ssl_layer.test_facility.ServerThread;
 import com.alytvyniuk.ssl_layer.test_facility.SslContextProvider;
 
 import org.apache.commons.io.FileUtils;
-import org.junit.After;
 import org.junit.Before;
 
 import java.io.File;
@@ -59,6 +58,7 @@ public abstract class BaseTest {
     protected boolean mIsBidirectional;
     protected File mRequestFile;
     protected File mResponseFile;
+    protected boolean mIsCleanupRequired = true;
 
     private SslContextProvider mSslContextProvider;
 
@@ -122,17 +122,19 @@ public abstract class BaseTest {
             e.printStackTrace();
         }
         onConnectionFinished();
+        cleanupIfRequired();
     }
 
     protected abstract void onConnectionFinished();
 
+    private void cleanupIfRequired() throws IOException {
+        if (mIsCleanupRequired) {
+            FileUtils.deleteDirectory(mTestDir);
+        }
+    }
+
     @Before
     public void printName() {
         System.out.println(getClass().getSimpleName());
-    }
-
-    @After
-    public void cleanup() throws IOException {
-        FileUtils.deleteDirectory(mTestDir);
     }
 }

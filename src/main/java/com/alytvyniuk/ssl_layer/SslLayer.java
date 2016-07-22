@@ -106,7 +106,7 @@ public class SslLayer extends SSLHandShaker {
         if (readEncryptedByteBuffer.hasRemaining()) {
             readDecryptedByteBuffer.clear();
             SSLEngineResult r = sslEngine.unwrap(readEncryptedByteBuffer, readDecryptedByteBuffer);
-            log("unwrap done" + getResultString(r));
+            log("unwrap done " + getResultString(r));
             if (r.getStatus() == SSLEngineResult.Status.OK) {
                 readDecryptedByteBuffer.flip();
                 return r.bytesProduced();
@@ -137,8 +137,8 @@ public class SslLayer extends SSLHandShaker {
         int sentLength = 0;
         while (sentLength < maxLength) {
             if (writeDecryptedByteBuffer.hasRemaining()) {
-                sentLength += writeDecryptedByteBuffer.limit();
-                offset += sentLength;
+                sentLength += writeDecryptedByteBuffer.remaining();
+                offset = sentLength;
                 wrap();
             } else {
                 writeDecryptedByteBuffer.clear();
